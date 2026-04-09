@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../navigation/AuthNavigator';
 
-type Props = {
-  onNavigateToRegister: () => void;
-};
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-const LoginScreen = ({ onNavigateToRegister }: Props) => {
+const LoginScreen = ({ navigation }: Props) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -18,16 +18,33 @@ const LoginScreen = ({ onNavigateToRegister }: Props) => {
   const handleLogin = () => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Invalid email', 'Please re-enter email');
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
+    if (!password) {
+      setErrorMessage('Password cannot be empty.');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters.');
+      return;
+    }
+    setErrorMessage('');
+    setIsLoading(true);
     signInWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        const user = userCredential.user;
-        Alert.alert('Login successful!', `Hello, ${user.email}`);
-      })
+      .then(() => navigation.navigate('Homepage'))
       .catch((error) => {
-        Alert.alert('Login failed!', error.message);
+        const code = error.code;
+        if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+          setErrorMessage('Incorrect email or password.');
+        } else if (code === 'auth/too-many-requests') {
+          setErrorMessage('Too many attempts. Please try again later.');
+        } else {
+          setErrorMessage(error.message);
+        }
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   };
 
@@ -58,6 +75,8 @@ const LoginScreen = ({ onNavigateToRegister }: Props) => {
             value={email}
             onChangeText={setEmail}
             style={styles.textInput}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
         </View>
         <View style={styles.inputWrapper}>
@@ -84,9 +103,9 @@ const LoginScreen = ({ onNavigateToRegister }: Props) => {
           </TouchableOpacity>
         </View>
         <View style={styles.registerContainer}>
-          <TouchableOpacity onPress={onNavigateToRegister}>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
             <Text style={styles.registerText}>
-              Don't have an account? <Text style={styles.registerLink}>Sign Up</Text>
+              Don{"'"}t have an account? <Text style={styles.registerLink}>Sign Up</Text>
             </Text>
           </TouchableOpacity>
         </View>

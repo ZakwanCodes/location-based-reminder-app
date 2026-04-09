@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../navigation/AuthNavigator';
 
-type Props = {
-  onNavigateToLogin: () => void;
-};
+type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
-const RegisterScreen = ({ onNavigateToLogin }: Props) => {
+const RegisterScreen = ({ navigation }: Props) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -18,18 +18,32 @@ const RegisterScreen = ({ onNavigateToLogin }: Props) => {
   const handleRegister = () => {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Invalid email', 'Please re-enter email');
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
+    if (!password) {
+      setErrorMessage('Password cannot be empty.');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters.');
+      return;
+    }
+    setErrorMessage('');
     setIsLoading(true);
     createUserWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
-        const user = userCredential.user;
-        Alert.alert('Registration successful!', `Welcome, ${user.email}`);
-        onNavigateToLogin();
+        navigation.navigate('Login');
       })
       .catch((error) => {
-        setErrorMessage(error.message);
+        const code = error.code;
+        if (code === 'auth/email-already-in-use') {
+          setErrorMessage('An account with this email already exists.');
+        } else if (code === 'auth/weak-password') {
+          setErrorMessage('Password must be at least 6 characters.');
+        } else {
+          setErrorMessage(error.message);
+        }
       })
       .finally(() => {
         setIsLoading(false);
@@ -91,7 +105,7 @@ const RegisterScreen = ({ onNavigateToLogin }: Props) => {
           </TouchableOpacity>
         </View>
         <View style={styles.loginContainer}>
-          <TouchableOpacity onPress={onNavigateToLogin}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.loginText}>
               Already have an account? <Text style={styles.loginLink}>Log In</Text>
             </Text>

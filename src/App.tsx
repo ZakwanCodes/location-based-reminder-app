@@ -1,16 +1,12 @@
-import React, { useState } from 'react';
-import LoginScreen from './pages/login';
-import RegisterScreen from './pages/register';
+import React from 'react';
+import AuthNavigator from './navigation/AuthNavigator';
 
 const App = () => {
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'register'>('login');
 
-  if (currentScreen === 'register') {
-    return <RegisterScreen onNavigateToLogin={() => setCurrentScreen('login')} />;
-  }
+  return (
+    <AuthNavigator />
+  )
 
-  return <LoginScreen onNavigateToRegister={() => setCurrentScreen('register')} />;
-};
+}
 
 export default App;
-
