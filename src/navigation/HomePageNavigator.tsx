@@ -1,10 +1,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import RemindersScreen from '../pages/reminders';
-import MapScreen from '../pages/map';
-import NotificationsScreen from '../pages/notifications';
-import ProfileScreen from '../pages/profile';
+import RemindersScreen from '../screens/reminders';
+import MapScreen from '../screens/map';
+import NotificationsScreen from '../screens/notifications';
+import ProfileScreen from '../screens/profile';
 
 export type HomeTabParamList = {
   Reminders: undefined;

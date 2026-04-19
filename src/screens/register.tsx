@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Keyboard } from 'react-native';
+import { registerUser } from '../services/authService';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
@@ -15,39 +14,20 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleRegister = () => {
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailRegex.test(email)) {
-      setErrorMessage('Please enter a valid email address.');
-      return;
-    }
-    if (!password) {
-      setErrorMessage('Password cannot be empty.');
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters.');
-      return;
-    }
-    setErrorMessage('');
+  const handleRegister = async () => {
+    Keyboard.dismiss();
     setIsLoading(true);
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        navigation.navigate('Login');
-      })
-      .catch((error) => {
-        const code = error.code;
-        if (code === 'auth/email-already-in-use') {
-          setErrorMessage('An account with this email already exists.');
-        } else if (code === 'auth/weak-password') {
-          setErrorMessage('Password must be at least 6 characters.');
-        } else {
-          setErrorMessage(error.message);
-        }
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    setErrorMessage('');
+
+    const result = await registerUser(email, password);
+
+    if (result.success) {
+      navigation.navigate('Login');
+    } else {
+      setErrorMessage(result.error || 'Registration failed');
+    }
+
+    setIsLoading(false);
   };
 
   const togglePasswordVisibility = () => {

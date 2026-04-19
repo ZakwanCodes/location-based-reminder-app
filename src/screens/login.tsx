@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Keyboard } from 'react-native';
+import { loginUser } from '../services/authService';
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
@@ -15,37 +14,20 @@ const LoginScreen = ({ navigation }: Props) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleLogin = () => {
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    if (!emailRegex.test(email)) {
-      setErrorMessage('Please enter a valid email address.');
-      return;
-    }
-    if (!password) {
-      setErrorMessage('Password cannot be empty.');
-      return;
-    }
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters.');
-      return;
-    }
-    setErrorMessage('');
+  const handleLogin = async () => {
+    Keyboard.dismiss();
     setIsLoading(true);
-    signInWithEmailAndPassword(auth, email, password)
-      .then(() => navigation.navigate('Homepage'))
-      .catch((error) => {
-        const code = error.code;
-        if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-          setErrorMessage('Incorrect email or password.');
-        } else if (code === 'auth/too-many-requests') {
-          setErrorMessage('Too many attempts. Please try again later.');
-        } else {
-          setErrorMessage(error.message);
-        }
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    setErrorMessage('');
+
+    const result = await loginUser(email, password);
+
+    if (result.success) {
+      navigation.navigate('Homepage');
+    } else {
+      setErrorMessage(result.error || 'Login failed');
+    }
+
+    setIsLoading(false);
   };
 
   const togglePasswordVisibility = () => {

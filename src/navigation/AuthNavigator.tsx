@@ -1,8 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import LoginScreen from '../pages/login';
-import RegisterScreen from '../pages/register';
+import LoginScreen from '../screens/login';
+import RegisterScreen from '../screens/register';
 import HomePageNavigator from './HomePageNavigator';
 
 export type AuthStackParamList = {
