@@ -7,7 +7,7 @@ import NotificationsScreen from '../screens/notifications';
 import ProfileScreen from '../screens/profile';
 
 export type HomeTabParamList = {
-  Reminders: undefined;
+  Reminders: { expandPast?: boolean } | undefined;
   Map: undefined;
   Notifications: undefined;
   Profile: undefined;
@@ -29,8 +29,15 @@ const HomePageNavigator = () => {
           };
           return <MaterialIcons name={icons[route.name as keyof HomeTabParamList]} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#456FE8',
-        tabBarInactiveTintColor: '#9d9d9d',
+        tabBarActiveTintColor: '#6366F1',
+        tabBarInactiveTintColor: '#4B5563',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
+        tabBarStyle: {
+          backgroundColor: '#0D1117',
+          borderTopColor: '#21262D',
+          borderTopWidth: 1,
+          paddingTop: 6,
+        },
       })}
     >
       <Tab.Screen name="Reminders" component={RemindersScreen} />
