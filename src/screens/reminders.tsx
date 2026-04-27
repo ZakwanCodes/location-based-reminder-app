@@ -60,6 +60,7 @@ const RemindersScreen = () => {
   const [locationLoading, setLocationLoading] = useState(false);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [showPastReminders, setShowPastReminders] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ title?: string; description?: string; date?: string; location?: string }>({});
 
@@ -103,6 +104,12 @@ const RemindersScreen = () => {
   useEffect(() => {
     fetchReminders();
   }, [fetchReminders]);
+
+  useEffect(() => {
+    if (editingId) {
+      setShowCreateForm(true);
+    }
+  }, [editingId]);
 
   /** Attaches the current device location to the reminder, or clears it if already set. */
   const handleAttachLocation = async () => {
@@ -287,7 +294,12 @@ const RemindersScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>My Reminders</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerIcon}>
+          <MaterialIcons name="notifications-active" size={24} color="#6366F1" />
+        </View>
+        <Text style={styles.heading}>My Reminders</Text>
+      </View>
       {!!editingId && (
         <View style={styles.editBanner}>
           <MaterialIcons name="edit" size={13} color="#FBBF24" />
@@ -299,152 +311,174 @@ const RemindersScreen = () => {
       )}
       {!!statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
 
-      {/* ── Form ── */}
-      <TextInput
-        style={[styles.input, !!errors.title && styles.inputError]}
-        placeholder="Title"
-        placeholderTextColor="#4B5563"
-        value={title}
-        onChangeText={t => { setTitle(t); if (errors.title) setErrors(e => ({ ...e, title: undefined })); }}
-      />
-      {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
-
-      <TextInput
-        style={[styles.input, !!errors.description && styles.inputError]}
-        placeholder="Description"
-        placeholderTextColor="#4B5563"
-        value={description}
-        onChangeText={t => { setDescription(t); if (errors.description) setErrors(e => ({ ...e, description: undefined })); }}
-      />
-      {!!errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
-
-      <TouchableOpacity
-        style={[styles.dateButton, !!errors.date && styles.inputError]}
-        onPress={openDatePicker}
-      >
-        <Text style={[styles.dateButtonText, !dueDate && styles.placeholderText]}>
-          {dueDate ? `Due: ${dueDate.toDateString()}` : 'Select due date'}
-        </Text>
+      <TouchableOpacity style={styles.createToggle} onPress={() => setShowCreateForm(v => !v)} activeOpacity={0.8}>
+        <View>
+          <Text style={styles.createToggleTitle}>Create Reminder</Text>
+          <Text style={styles.createToggleSubtitle}>Tap to {showCreateForm ? 'collapse' : 'expand'} the form</Text>
+        </View>
+        <MaterialIcons name={showCreateForm ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={24} color="#6366F1" />
       </TouchableOpacity>
-      {!!errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
 
-      {showDatePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={draftDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
+      {showCreateForm && (
+        <View style={styles.createCard}>
+          {/* ── Form ── */}
+          <Text style={styles.sectionTitle}>Details</Text>
+          <TextInput
+            style={[styles.input, !!errors.title && styles.inputError]}
+            placeholder="Title"
+            placeholderTextColor="#4B5563"
+            value={title}
+            onChangeText={t => { setTitle(t); if (errors.title) setErrors(e => ({ ...e, title: undefined })); }}
+          />
+          {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
-      <Modal
-        visible={showDatePicker && Platform.OS === 'ios'}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <View style={styles.dateModalOverlay}>
-          <View style={styles.dateModalCard}>
-            <Text style={styles.dateModalTitle}>Pick a due date</Text>
+          <TextInput
+            style={[styles.input, !!errors.description && styles.inputError]}
+            placeholder="Description"
+            placeholderTextColor="#4B5563"
+            value={description}
+            onChangeText={t => { setDescription(t); if (errors.description) setErrors(e => ({ ...e, description: undefined })); }}
+          />
+          {!!errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+
+          <TouchableOpacity
+            style={[styles.dateButton, !!errors.date && styles.inputError]}
+            onPress={openDatePicker}
+          >
+            <Text style={[styles.dateButtonText, !dueDate && styles.placeholderText]}>
+              {dueDate ? `Due: ${dueDate.toDateString()}` : 'Select due date'}
+            </Text>
+          </TouchableOpacity>
+          {!!errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
+
+          {showDatePicker && Platform.OS === 'android' && (
             <DateTimePicker
               value={draftDate}
               mode="date"
-              display="spinner"
-              themeVariant="dark"
-              textColor="#E6EDF3"
-              accentColor="#818CF8"
+              display="default"
               onChange={handleDateChange}
-              style={styles.dateModalPicker}
             />
-            <View style={styles.dateModalActions}>
+          )}
+
+          <Modal
+            visible={showDatePicker && Platform.OS === 'ios'}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowDatePicker(false)}
+          >
+            <View style={styles.dateModalOverlay}>
+              <View style={styles.dateModalCard}>
+                <Text style={styles.dateModalTitle}>Pick a due date</Text>
+                <DateTimePicker
+                  value={draftDate}
+                  mode="date"
+                  display="spinner"
+                  themeVariant="dark"
+                  textColor="#E6EDF3"
+                  accentColor="#818CF8"
+                  onChange={handleDateChange}
+                  style={styles.dateModalPicker}
+                />
+                <View style={styles.dateModalActions}>
+                  <TouchableOpacity
+                    style={[styles.dateModalBtn, styles.dateModalBtnGhost]}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={styles.dateModalBtnGhostText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.dateModalBtn, styles.dateModalBtnPrimary]}
+                    onPress={() => {
+                      setDueDate(draftDate);
+                      setErrors(e => ({ ...e, date: undefined }));
+                      setShowDatePicker(false);
+                    }}
+                  >
+                    <Text style={styles.dateModalBtnPrimaryText}>Confirm</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* ── Location ── */}
+          <Text style={styles.sectionTitle}>Location</Text>
+          {location ? (
+            <TouchableOpacity
+              style={[styles.locationButton, styles.locationButtonActive]}
+              onPress={() => setLocation(null)}
+            >
+              <Text style={[styles.locationButtonText, styles.locationButtonTextActive]}>
+                {`📍 ${location.address ?? 'Location set'}  ✕`}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.locationRow}>
               <TouchableOpacity
-                style={[styles.dateModalBtn, styles.dateModalBtnGhost]}
-                onPress={() => setShowDatePicker(false)}
+                style={[styles.locationHalfButton, locationLoading && { opacity: 0.6 }]}
+                onPress={handleAttachLocation}
+                disabled={locationLoading}
               >
-                <Text style={styles.dateModalBtnGhostText}>Cancel</Text>
+                {locationLoading
+                  ? <ActivityIndicator size="small" color="#456FE8" />
+                  : <Text style={styles.locationButtonText}>📍 My Location</Text>}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.dateModalBtn, styles.dateModalBtnPrimary]}
-                onPress={() => {
-                  setDueDate(draftDate);
-                  setErrors(e => ({ ...e, date: undefined }));
-                  setShowDatePicker(false);
-                }}
+                style={styles.locationHalfButton}
+                onPress={() => setShowLocationSearch(true)}
               >
-                <Text style={styles.dateModalBtnPrimaryText}>Confirm</Text>
+                <Text style={styles.locationButtonText}>🔍 Search Place</Text>
               </TouchableOpacity>
             </View>
+          )}
+
+          {!!errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+
+          <Text style={styles.sectionTitle}>Priority</Text>
+          <LocationSearchModal
+            visible={showLocationSearch}
+            onConfirm={(loc) => { setLocation(loc); setErrors(e => ({ ...e, location: undefined })); setShowLocationSearch(false); }}
+            onClose={() => setShowLocationSearch(false)}
+          />
+
+          {/* ── Priority ── */}
+          <View style={styles.priorityRow}>
+            {(['low', 'medium', 'high'] as const).map((value) => (
+              <TouchableOpacity
+                key={value}
+                style={[styles.priorityChip, priority === value && styles.priorityChipActive]}
+                onPress={() => setPriority(value)}
+              >
+                <Text style={[styles.priorityText, priority === value && styles.priorityTextActive]}>
+                  {value.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCreateReminder} disabled={isLoading}>
+              <Text style={styles.buttonText}>{editingId ? 'Save Changes' : 'Create'}</Text>
+            </TouchableOpacity>
+            {editingId ? (
+              <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={resetForm} disabled={isLoading}>
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={() => {
+                  resetForm();
+                  fetchReminders();
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.buttonText}>Refresh</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
-      </Modal>
-
-      {/* ── Location ── */}
-      {location ? (
-        <TouchableOpacity
-          style={[styles.locationButton, styles.locationButtonActive]}
-          onPress={() => setLocation(null)}
-        >
-          <Text style={[styles.locationButtonText, styles.locationButtonTextActive]}>
-            {`📍 ${location.address ?? 'Location set'}  ✕`}
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.locationRow}>
-          <TouchableOpacity
-            style={[styles.locationHalfButton, locationLoading && { opacity: 0.6 }]}
-            onPress={handleAttachLocation}
-            disabled={locationLoading}
-          >
-            {locationLoading
-              ? <ActivityIndicator size="small" color="#456FE8" />
-              : <Text style={styles.locationButtonText}>📍 My Location</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.locationHalfButton}
-            onPress={() => setShowLocationSearch(true)}
-          >
-            <Text style={styles.locationButtonText}>🔍 Search Place</Text>
-          </TouchableOpacity>
-        </View>
       )}
-
-      {!!errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
-
-      <LocationSearchModal
-        visible={showLocationSearch}
-        onConfirm={(loc) => { setLocation(loc); setErrors(e => ({ ...e, location: undefined })); setShowLocationSearch(false); }}
-        onClose={() => setShowLocationSearch(false)}
-      />
-
-      {/* ── Priority ── */}
-      <View style={styles.priorityRow}>
-        {(['low', 'medium', 'high'] as const).map((value) => (
-          <TouchableOpacity
-            key={value}
-            style={[styles.priorityChip, priority === value && styles.priorityChipActive]}
-            onPress={() => setPriority(value)}
-          >
-            <Text style={[styles.priorityText, priority === value && styles.priorityTextActive]}>
-              {value.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCreateReminder} disabled={isLoading}>
-          <Text style={styles.buttonText}>{editingId ? 'Save Changes' : 'Create'}</Text>
-        </TouchableOpacity>
-        {editingId ? (
-          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={resetForm} disabled={isLoading}>
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={fetchReminders} disabled={isLoading}>
-            <Text style={styles.buttonText}>Refresh</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* ── List ── */}
       <FlatList
@@ -534,7 +568,14 @@ export default RemindersScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1117', paddingHorizontal: 16, paddingTop: 56 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  headerIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(99,102,241,0.12)' },
   heading: { fontSize: 26, fontWeight: '800', color: '#E6EDF3', marginBottom: 10 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#6366F1', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 10, marginBottom: 6 },
+  createCard: { borderWidth: 1, borderColor: '#21262D', borderRadius: 14, backgroundColor: '#161B22', padding: 14, marginTop: 6, marginBottom: 12 },
+  createToggle: { borderWidth: 1, borderColor: '#21262D', borderRadius: 14, backgroundColor: '#161B22', paddingHorizontal: 14, paddingVertical: 12, marginTop: 6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  createToggleTitle: { fontSize: 15, fontWeight: '700', color: '#E6EDF3' },
+  createToggleSubtitle: { fontSize: 11, color: '#8B949E', marginTop: 2 },
   statusText: { fontSize: 12, color: '#4B5563', marginBottom: 10 },
   errorText: { fontSize: 12, color: '#EF4444', marginBottom: 8, marginTop: -6 },
   input: {
