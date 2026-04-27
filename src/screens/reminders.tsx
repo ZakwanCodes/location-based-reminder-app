@@ -1,22 +1,23 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRoute, RouteProp } from '@react-navigation/native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { HomeTabParamList } from '../navigation/HomePageNavigator';
+import LocationSearchModal from '../components/LocationSearchModal';
 import {
   Alert,
   FlatList,
   Keyboard,
   Linking,
   Modal,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import {
   createReminder,
   deleteReminder,
@@ -28,8 +29,6 @@ import {
   requestLocationPermissions,
   getCurrentLocation,
   getAddressFromCoords,
-  searchPlaces,
-  type LocationSearchResult,
   type ReminderLocation,
 } from '../services/locationService';
 
@@ -45,254 +44,17 @@ type ReminderItem = {
   location?: ReminderLocation;
 };
 
-// ─── Date Picker ──────────────────────────────────────────────────────────────
-
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-/** Returns the number of days in a given month/year (handles leap years via Date overflow). */
-function getDaysInMonth(month: number, year: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-type DatePickerModalProps = {
-  visible: boolean;
-  selected: Date | null;
-  onConfirm: (date: Date) => void;
-  onClose: () => void;
-};
-
-/** Modal calendar picker. Syncs its internal month/day/year state whenever the modal opens or the selected date changes. */
-function DatePickerModal({ visible, selected, onConfirm, onClose }: DatePickerModalProps) {
-  const initial = selected ?? new Date();
-  const [month, setMonth] = useState(initial.getMonth());
-  const [year, setYear] = useState(initial.getFullYear());
-  const [pickedDay, setPickedDay] = useState(initial.getDate());
-
-  useEffect(() => {
-    if (visible) {
-      const d = selected ?? new Date();
-      setMonth(d.getMonth());
-      setYear(d.getFullYear());
-      setPickedDay(d.getDate());
-    }
-  }, [visible, selected]);
-
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = getDaysInMonth(month, year);
-
-  const prevMonth = () => {
-    if (month === 0) { setMonth(11); setYear(y => y - 1); }
-    else setMonth(m => m - 1);
-  };
-
-  const nextMonth = () => {
-    if (month === 11) { setMonth(0); setYear(y => y + 1); }
-    else setMonth(m => m + 1);
-  };
-
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={pickerStyles.overlay}>
-        <View style={pickerStyles.container}>
-          <View style={pickerStyles.header}>
-            <TouchableOpacity onPress={prevMonth} style={pickerStyles.navBtn}>
-              <Text style={pickerStyles.navText}>{'‹'}</Text>
-            </TouchableOpacity>
-            <Text style={pickerStyles.monthYear}>{MONTHS[month]} {year}</Text>
-            <TouchableOpacity onPress={nextMonth} style={pickerStyles.navBtn}>
-              <Text style={pickerStyles.navText}>{'›'}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={pickerStyles.dayLabels}>
-            {DAY_LABELS.map(d => (
-              <Text key={d} style={pickerStyles.dayLabel}>{d}</Text>
-            ))}
-          </View>
-          <View style={pickerStyles.grid}>
-            {cells.map((day, i) =>
-              day === null ? (
-                <View key={`e-${i}`} style={pickerStyles.cell} />
-              ) : (
-                <TouchableOpacity
-                  key={day}
-                  style={[pickerStyles.cell, pickedDay === day && pickerStyles.selectedCell]}
-                  onPress={() => setPickedDay(day)}
-                >
-                  <Text style={[pickerStyles.dayText, pickedDay === day && pickerStyles.selectedDayText]}>
-                    {day}
-                  </Text>
-                </TouchableOpacity>
-              )
-            )}
-          </View>
-          <View style={pickerStyles.footer}>
-            <TouchableOpacity onPress={onClose} style={pickerStyles.cancelBtn}>
-              <Text style={pickerStyles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => onConfirm(new Date(year, month, pickedDay))}
-              style={pickerStyles.confirmBtn}
-            >
-              <Text style={pickerStyles.confirmText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── Location Search Modal ────────────────────────────────────────────────────
-
-type LocationSearchModalProps = {
-  visible: boolean;
-  onConfirm: (loc: ReminderLocation) => void;
-  onClose: () => void;
-};
-
-/** Modal for searching a place by name via Nominatim. Shows a map marker preview of the selected result before confirming. */
-function LocationSearchModal({ visible, onConfirm, onClose }: LocationSearchModalProps) {
-  const [query, setQuery] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<LocationSearchResult[]>([]);
-  const [selected, setSelected] = useState<LocationSearchResult | null>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!visible) {
-      setQuery('');
-      setResults([]);
-      setSelected(null);
-      setError('');
-    }
-  }, [visible]);
-
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    Keyboard.dismiss();
-    setSearching(true);
-    setError('');
-    setResults([]);
-    setSelected(null);
-    try {
-      const found = await searchPlaces(query.trim());
-      if (!found.length) {
-        setError('No results found. Try a more specific search.');
-        return;
-      }
-      setResults(found);
-    } catch {
-      setError('Search failed. Check your connection and try again.');
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleConfirm = () => {
-    if (!selected) return;
-    const shortAddress = selected.displayName.split(',').slice(0, 3).join(',').trim();
-    onConfirm({ latitude: selected.latitude, longitude: selected.longitude, radius: 200, address: shortAddress });
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={searchStyles.overlay}>
-        <View style={searchStyles.container}>
-          <Text style={searchStyles.title}>Search a Place</Text>
-
-          <View style={searchStyles.inputRow}>
-            <TextInput
-              style={searchStyles.input}
-              placeholder="e.g. Walmart Toronto"
-              placeholderTextColor="#4B5563"
-              value={query}
-              onChangeText={(t) => { setQuery(t); setError(''); setResults([]); setSelected(null); }}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-              autoFocus
-            />
-            <TouchableOpacity
-              onPress={handleSearch}
-              style={[searchStyles.searchBtn, searching && { opacity: 0.6 }]}
-              disabled={searching}
-            >
-              {searching
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={searchStyles.searchBtnText}>Go</Text>}
-            </TouchableOpacity>
-          </View>
-
-          {!!error && <Text style={searchStyles.error}>{error}</Text>}
-
-          {results.length > 0 && (
-            <ScrollView style={searchStyles.resultsList} keyboardShouldPersistTaps="handled">
-              {results.map((r, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[searchStyles.resultItem, selected === r && searchStyles.resultItemSelected]}
-                  onPress={() => setSelected(r)}
-                >
-                  <Text
-                    style={[searchStyles.resultText, selected === r && searchStyles.resultTextSelected]}
-                    numberOfLines={2}
-                  >
-                    {r.displayName}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          {selected && (
-            <MapView
-              style={searchStyles.map}
-              region={{
-                latitude: selected.latitude,
-                longitude: selected.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-            >
-              <Marker coordinate={{ latitude: selected.latitude, longitude: selected.longitude }} />
-            </MapView>
-          )}
-
-          <View style={searchStyles.footer}>
-            <TouchableOpacity onPress={onClose} style={searchStyles.cancelBtn}>
-              <Text style={searchStyles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleConfirm}
-              style={[searchStyles.confirmBtn, !selected && { opacity: 0.4 }]}
-              disabled={!selected}
-            >
-              <Text style={searchStyles.confirmText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+/**
+ * Renders the reminders screen and manages reminder form, date, location, and list interactions.
+ */
 const RemindersScreen = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [draftDate, setDraftDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [location, setLocation] = useState<ReminderLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -302,13 +64,16 @@ const RemindersScreen = () => {
   const [errors, setErrors] = useState<{ title?: string; description?: string; date?: string; location?: string }>({});
 
   const route = useRoute<RouteProp<HomeTabParamList, 'Reminders'>>();
+  const expandPast = (route.params as { expandPast?: boolean } | undefined)?.expandPast;
+
   useEffect(() => {
-    if (route.params?.expandPast) setShowPastReminders(true);
-  }, [route.params?.expandPast]);
+    if (expandPast) setShowPastReminders(true);
+  }, [expandPast]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
+  /** Returns the authenticated user id, or sets a status message if no user is logged in. */
   const getUserId = () => {
     const user = getCurrentUser();
     if (!user) {
@@ -318,6 +83,7 @@ const RemindersScreen = () => {
     return user.uid;
   };
 
+  /** Loads reminders for the current user from the database and updates loading/status state. */
   const fetchReminders = useCallback(async () => {
     const userId = getUserId();
     if (!userId) return;
@@ -338,6 +104,7 @@ const RemindersScreen = () => {
     fetchReminders();
   }, [fetchReminders]);
 
+  /** Attaches the current device location to the reminder, or clears it if already set. */
   const handleAttachLocation = async () => {
     if (location) {
       setLocation(null);
@@ -368,6 +135,7 @@ const RemindersScreen = () => {
     }
   };
 
+  /** Clears all reminder form fields and resets editing/error state. */
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -378,6 +146,7 @@ const RemindersScreen = () => {
     setErrors({});
   };
 
+  /** Prefills the form with an existing reminder so it can be edited. */
   const handleEditReminder = (item: ReminderItem) => {
     setEditingId(item.id);
     setTitle(item.title ?? '');
@@ -385,14 +154,15 @@ const RemindersScreen = () => {
     setPriority(item.priority ?? 'medium');
     const d =
       item.dueDate instanceof Date ? item.dueDate
-      : typeof (item.dueDate as any)?.toDate === 'function' ? (item.dueDate as any).toDate()
-      : new Date();
+        : typeof (item.dueDate as any)?.toDate === 'function' ? (item.dueDate as any).toDate()
+          : new Date();
     setDueDate(d);
     setLocation(item.location ?? null);
     setStatusMessage('');
     setErrors({});
   };
 
+  /** Validates and creates a new reminder or updates the selected reminder being edited. */
   const handleCreateReminder = async () => {
     Keyboard.dismiss();
     const userId = getUserId();
@@ -437,6 +207,7 @@ const RemindersScreen = () => {
     }
   };
 
+  /** Toggles completion status for a reminder and refreshes the list. */
   const handleToggleComplete = async (item: ReminderItem) => {
     setIsLoading(true);
     try {
@@ -450,6 +221,7 @@ const RemindersScreen = () => {
     }
   };
 
+  /** Shows a confirmation prompt before marking a reminder as complete. */
   const confirmMarkDone = (item: ReminderItem) => {
     Alert.alert(
       'Mark as Complete',
@@ -461,6 +233,7 @@ const RemindersScreen = () => {
     );
   };
 
+  /** Deletes a reminder by id and refreshes reminder data. */
   const handleDeleteReminder = async (id: string) => {
     setIsLoading(true);
     try {
@@ -473,6 +246,7 @@ const RemindersScreen = () => {
     }
   };
 
+  /** Shows a destructive confirmation prompt before deleting a reminder. */
   const confirmDelete = (id: string) => {
     Alert.alert('Delete Reminder', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
@@ -480,12 +254,35 @@ const RemindersScreen = () => {
     ]);
   };
 
+  /** Formats reminder due date values from string, Date, or Firestore timestamp-like objects. */
   const formatDueDate = (date: ReminderItem['dueDate']) => {
     if (!date) return 'No date';
     if (typeof date === 'string') return date;
     if (date instanceof Date) return date.toDateString();
     if (typeof date.toDate === 'function') return date.toDate().toDateString();
     return 'Unknown date';
+  };
+
+  /** Opens the date picker and initializes the draft date from current due date or today. */
+  const openDatePicker = () => {
+    setDraftDate(dueDate ?? new Date());
+    setShowDatePicker(true);
+  };
+
+  /** Handles platform-specific date picker changes and commits selection when appropriate. */
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (event.type === 'set' && selectedDate) {
+        setDueDate(selectedDate);
+        setErrors(e => ({ ...e, date: undefined }));
+      }
+      return;
+    }
+
+    if (selectedDate) {
+      setDraftDate(selectedDate);
+    }
   };
 
   return (
@@ -523,7 +320,7 @@ const RemindersScreen = () => {
 
       <TouchableOpacity
         style={[styles.dateButton, !!errors.date && styles.inputError]}
-        onPress={() => setShowDatePicker(true)}
+        onPress={openDatePicker}
       >
         <Text style={[styles.dateButtonText, !dueDate && styles.placeholderText]}>
           {dueDate ? `Due: ${dueDate.toDateString()}` : 'Select due date'}
@@ -531,12 +328,55 @@ const RemindersScreen = () => {
       </TouchableOpacity>
       {!!errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
 
-      <DatePickerModal
-        visible={showDatePicker}
-        selected={dueDate}
-        onConfirm={(date) => { setDueDate(date); setErrors(e => ({ ...e, date: undefined })); setShowDatePicker(false); }}
-        onClose={() => setShowDatePicker(false)}
-      />
+      {showDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={draftDate}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+
+      <Modal
+        visible={showDatePicker && Platform.OS === 'ios'}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.dateModalOverlay}>
+          <View style={styles.dateModalCard}>
+            <Text style={styles.dateModalTitle}>Pick a due date</Text>
+            <DateTimePicker
+              value={draftDate}
+              mode="date"
+              display="spinner"
+              themeVariant="dark"
+              textColor="#E6EDF3"
+              accentColor="#818CF8"
+              onChange={handleDateChange}
+              style={styles.dateModalPicker}
+            />
+            <View style={styles.dateModalActions}>
+              <TouchableOpacity
+                style={[styles.dateModalBtn, styles.dateModalBtnGhost]}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.dateModalBtnGhostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dateModalBtn, styles.dateModalBtnPrimary]}
+                onPress={() => {
+                  setDueDate(draftDate);
+                  setErrors(e => ({ ...e, date: undefined }));
+                  setShowDatePicker(false);
+                }}
+              >
+                <Text style={styles.dateModalBtnPrimaryText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Location ── */}
       {location ? (
@@ -692,27 +532,6 @@ export default RemindersScreen;
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const pickerStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  container: { backgroundColor: '#161B22', borderRadius: 16, borderWidth: 1, borderColor: '#21262D', padding: 16, width: 320 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  navBtn: { padding: 8 },
-  navText: { fontSize: 22, color: '#6366F1', fontWeight: '600' },
-  monthYear: { fontSize: 16, fontWeight: '700', color: '#E6EDF3' },
-  dayLabels: { flexDirection: 'row', marginBottom: 4 },
-  dayLabel: { width: 40, textAlign: 'center', fontSize: 11, color: '#4B5563', fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 20, marginBottom: 2 },
-  selectedCell: { backgroundColor: '#6366F1' },
-  dayText: { fontSize: 14, color: '#8B949E' },
-  selectedDayText: { color: '#fff', fontWeight: '700' },
-  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 12 },
-  cancelBtn: { paddingVertical: 8, paddingHorizontal: 16 },
-  cancelText: { color: '#8B949E', fontWeight: '600' },
-  confirmBtn: { backgroundColor: '#6366F1', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 },
-  confirmText: { color: '#fff', fontWeight: '700' },
-});
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1117', paddingHorizontal: 16, paddingTop: 56 },
   heading: { fontSize: 26, fontWeight: '800', color: '#E6EDF3', marginBottom: 10 },
@@ -729,6 +548,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 11, marginBottom: 10, backgroundColor: '#161B22',
   },
   dateButtonText: { color: '#8B949E', fontSize: 14 },
+  dateModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  dateModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#161B22',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#21262D',
+    paddingTop: 14,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+  },
+  dateModalTitle: {
+    color: '#E6EDF3',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  dateModalPicker: {
+    alignSelf: 'center',
+    height: 150,
+    marginVertical: 2,
+  },
+  dateModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  dateModalBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  dateModalBtnGhost: {
+    backgroundColor: '#0D1117',
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  dateModalBtnPrimary: {
+    backgroundColor: '#6366F1',
+  },
+  dateModalBtnGhostText: {
+    color: '#8B949E',
+    fontWeight: '700',
+  },
+  dateModalBtnPrimaryText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   placeholderText: { color: '#4B5563' },
   locationRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   locationHalfButton: {
@@ -797,34 +673,3 @@ const styles = StyleSheet.create({
   cardTitlePast: { fontSize: 16, fontWeight: '700', color: '#4B5563', marginBottom: 4 },
 });
 
-const searchStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
-  container: { backgroundColor: '#161B22', borderRadius: 16, borderWidth: 1, borderColor: '#21262D', padding: 20, width: 320 },
-  title: { fontSize: 17, fontWeight: '700', color: '#E6EDF3', marginBottom: 14 },
-  inputRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  input: {
-    flex: 1, borderWidth: 1, borderColor: '#21262D', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
-    backgroundColor: '#0D1117', color: '#E6EDF3',
-  },
-  searchBtn: {
-    backgroundColor: '#6366F1', borderRadius: 10,
-    paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center', minWidth: 44,
-  },
-  searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  error: { fontSize: 12, color: '#EF4444', marginBottom: 8 },
-  resultsList: { maxHeight: 160, marginBottom: 8 },
-  resultItem: {
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderBottomWidth: 1, borderBottomColor: '#21262D',
-  },
-  resultItemSelected: { backgroundColor: 'rgba(99,102,241,0.12)' },
-  resultText: { fontSize: 13, color: '#8B949E' },
-  resultTextSelected: { color: '#818CF8', fontWeight: '600' },
-  map: { height: 160, borderRadius: 10, marginBottom: 12, overflow: 'hidden' },
-  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 },
-  cancelBtn: { paddingVertical: 8, paddingHorizontal: 16 },
-  cancelText: { color: '#8B949E', fontWeight: '600' },
-  confirmBtn: { backgroundColor: '#6366F1', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 20, minWidth: 80, alignItems: 'center' },
-  confirmText: { color: '#fff', fontWeight: '700' },
-});

@@ -57,7 +57,7 @@ const NotificationsScreen = () => {
   };
 
   const handleTap = () => {
-    navigation.navigate('Reminders', { expandPast: true });
+    navigation.navigate('Reminders');
   };
 
   const renderRightAction = (id: string) => (
