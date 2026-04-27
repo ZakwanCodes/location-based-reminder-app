@@ -7,7 +7,7 @@ import NotificationsScreen from '../screens/notifications';
 import ProfileScreen from '../screens/profile';
 
 export type HomeTabParamList = {
-  Reminders: { expandPast?: boolean } | undefined;
+  Reminders: undefined;
   Map: undefined;
   Notifications: undefined;
   Profile: undefined;

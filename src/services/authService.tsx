@@ -21,9 +21,34 @@ const validatePassword = (password: string): { valid: boolean; error?: string } 
     if (!password) {
         return { valid: false, error: 'Password cannot be empty.' };
     }
-    if (password.length < 6) {
-        return { valid: false, error: 'Password must be at least 6 characters.' };
+    if (password.length < 8) {
+        return { valid: false, error: 'Password must be at least 8 characters.' };
     }
+
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecialCharacter = /[^A-Za-z0-9]/.test(password);
+
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecialCharacter) {
+        return {
+            valid: false,
+            error: 'Password must include an uppercase letter, a lowercase letter, a number, and a special character.'
+        };
+    }
+
+    return { valid: true };
+};
+
+/**
+ * Validate login password input only.
+ * Keep this light so failed attempts can still be checked by Firebase.
+ */
+const validateLoginPassword = (password: string): { valid: boolean; error?: string } => {
+    if (!password) {
+        return { valid: false, error: 'Password cannot be empty.' };
+    }
+
     return { valid: true };
 };
 
@@ -34,14 +59,14 @@ const getErrorMessage = (errorCode: string, errorMessage: string): string => {
     switch (errorCode) {
         case 'auth/user-not-found':
         case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-            return 'Incorrect email or password.';
         case 'auth/too-many-requests':
             return 'Too many attempts. Please try again later.';
+        case 'auth/invalid-credential':
+            return 'Incorrect email or password.';
         case 'auth/email-already-in-use':
             return 'An account with this email already exists.';
         case 'auth/weak-password':
-            return 'Password must be at least 6 characters.';
+            return 'Password must be at least 8 characters and include uppercase, lowercase, number, and special character.';
         default:
             return errorMessage;
     }
@@ -63,7 +88,7 @@ export const loginUser = async (
         return { success: false, error: emailValidation.error };
     }
 
-    const passwordValidation = validatePassword(password);
+    const passwordValidation = validateLoginPassword(password);
     if (!passwordValidation.valid) {
         return { success: false, error: passwordValidation.error };
     }
