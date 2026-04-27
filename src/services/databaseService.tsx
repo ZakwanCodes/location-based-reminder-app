@@ -26,6 +26,12 @@ export const createReminder = async (
         dueDate: Date;
         priority?: 'low' | 'medium' | 'high';
         completed?: boolean;
+        location?: {
+            latitude: number;
+            longitude: number;
+            radius: number;
+            address?: string;
+        };
     }
 ) => {
     return await addDoc(collection(db, 'reminders'), {
