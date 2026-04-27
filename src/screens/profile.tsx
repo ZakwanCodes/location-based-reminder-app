@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  ScrollView, ActivityIndicator,
+  ScrollView, ActivityIndicator, Modal, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -15,16 +15,26 @@ import { getLocationPermissionStatus } from '../services/locationService';
 
 type ReminderItem = {
   id: string;
+  title?: string;
+  description?: string;
   completed?: boolean;
-  location?: object;
+  location?: {
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  };
 };
+
+type StatFilter = 'total' | 'done' | 'inProgress';
 
 const ProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const user = getCurrentUser();
-  const [stats, setStats] = useState({ total: 0, completed: 0, withLocation: 0 });
+  const [stats, setStats] = useState({ total: 0, completed: 0, inProgress: 0 });
+  const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [permissionStatus, setPermissionStatus] = useState({ notifications: false, location: false });
+  const [activeFilter, setActiveFilter] = useState<StatFilter | null>(null);
 
   const email = user?.email ?? 'Unknown';
   const initials = email.charAt(0).toUpperCase();
@@ -37,10 +47,11 @@ const ProfileScreen = () => {
     setStatsLoading(true);
     try {
       const reminders = (await getUserReminders(user.uid)) as ReminderItem[];
+      setReminders(reminders);
       setStats({
         total: reminders.length,
         completed: reminders.filter(r => r.completed).length,
-        withLocation: reminders.filter(r => !!r.location).length,
+        inProgress: reminders.filter(r => !r.completed).length,
       });
     } catch {
       // stats are decorative — fail silently
@@ -80,6 +91,28 @@ const ProfileScreen = () => {
     ]);
   };
 
+  const openStatDetails = (filter: StatFilter) => {
+    setActiveFilter(filter);
+  };
+
+  const closeStatDetails = () => {
+    setActiveFilter(null);
+  };
+
+  const filteredReminders =
+    activeFilter === 'done'
+      ? reminders.filter(r => !!r.completed)
+      : activeFilter === 'inProgress'
+        ? reminders.filter(r => !r.completed)
+        : reminders;
+
+  const filterTitle =
+    activeFilter === 'done'
+      ? 'Done Reminders'
+      : activeFilter === 'inProgress'
+        ? 'In-Progress Reminders'
+        : 'All Reminders';
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -99,20 +132,20 @@ const ProfileScreen = () => {
             <ActivityIndicator color="#6366F1" style={{ paddingVertical: 8 }} />
           ) : (
             <View style={styles.statsRow}>
-              <View style={styles.statItem}>
+              <TouchableOpacity style={styles.statItem} onPress={() => openStatDetails('total')} activeOpacity={0.7}>
                 <Text style={styles.statNumber}>{stats.total}</Text>
                 <Text style={styles.statLabel}>TOTAL</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.statDivider} />
-              <View style={styles.statItem}>
+              <TouchableOpacity style={styles.statItem} onPress={() => openStatDetails('done')} activeOpacity={0.7}>
                 <Text style={[styles.statNumber, { color: '#34D399' }]}>{stats.completed}</Text>
                 <Text style={styles.statLabel}>DONE</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={[styles.statNumber, { color: '#22D3EE' }]}>{stats.withLocation}</Text>
-                <Text style={styles.statLabel}>LOCATION</Text>
-              </View>
+              <TouchableOpacity style={styles.statItem} onPress={() => openStatDetails('inProgress')} activeOpacity={0.7}>
+                <Text style={[styles.statNumber, { color: '#FBBF24' }]}>{stats.inProgress}</Text>
+                <Text style={styles.statLabel}>IN-PROGRESS</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -169,6 +202,40 @@ const ProfileScreen = () => {
 
         <Text style={styles.footer}>Remindify · Never forget what matters</Text>
       </ScrollView>
+
+      <Modal visible={!!activeFilter} transparent animationType="fade" onRequestClose={closeStatDetails}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{filterTitle}</Text>
+              <TouchableOpacity onPress={closeStatDetails} style={styles.closeBtn}>
+                <MaterialIcons name="close" size={20} color="#8B949E" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={filteredReminders}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.modalListContent}
+              ListEmptyComponent={<Text style={styles.modalEmpty}>No reminders in this category.</Text>}
+              renderItem={({ item }) => (
+                <View style={styles.modalItem}>
+                  <Text style={styles.modalItemTitle}>{item.title ?? 'Untitled'}</Text>
+                  {!!item.description && <Text style={styles.modalItemDesc}>{item.description}</Text>}
+                  {!!item.location && (
+                    <Text style={styles.modalItemMeta}>
+                      📍 {item.location.address ?? `${item.location.latitude?.toFixed?.(4)}, ${item.location.longitude?.toFixed?.(4)}`}
+                    </Text>
+                  )}
+                  <Text style={[styles.modalItemMeta, item.completed && { color: '#34D399' }]}>
+                    {item.completed ? 'Completed' : 'Active'}
+                  </Text>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -199,7 +266,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#21262D', padding: 20,
   },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
-  statItem: { flex: 1, alignItems: 'center' },
+  statItem: { flex: 1, alignItems: 'center', paddingVertical: 4, borderRadius: 10 },
   statNumber: { fontSize: 28, fontWeight: '800', color: '#6366F1' },
   statLabel: { fontSize: 10, color: '#8B949E', marginTop: 3, fontWeight: '700', letterSpacing: 0.8 },
   statDivider: { width: 1, height: 38, backgroundColor: '#21262D' },
@@ -232,4 +299,37 @@ const styles = StyleSheet.create({
   signOutText: { fontSize: 15, fontWeight: '700', color: '#EF4444' },
 
   footer: { textAlign: 'center', marginTop: 28, fontSize: 11, color: '#21262D' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    maxHeight: '78%',
+    backgroundColor: '#161B22',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#21262D',
+    padding: 16,
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  modalTitle: { flex: 1, fontSize: 16, fontWeight: '800', color: '#E6EDF3' },
+  closeBtn: { padding: 4 },
+  modalListContent: { paddingBottom: 8 },
+  modalEmpty: { color: '#4B5563', textAlign: 'center', marginTop: 22 },
+  modalItem: {
+    borderWidth: 1,
+    borderColor: '#21262D',
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: '#0D1117',
+    marginBottom: 8,
+  },
+  modalItemTitle: { fontSize: 14, fontWeight: '700', color: '#E6EDF3', marginBottom: 2 },
+  modalItemDesc: { fontSize: 12, color: '#8B949E', marginBottom: 3 },
+  modalItemMeta: { fontSize: 11, color: '#6366F1' },
 });
