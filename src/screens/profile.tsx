@@ -10,6 +10,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { getCurrentUser, logoutUser } from '../services/authService';
 import { getUserReminders } from '../services/databaseService';
+import { getNotificationPermissionStatus } from '../services/notificationService';
+import { getLocationPermissionStatus } from '../services/locationService';
 
 type ReminderItem = {
   id: string;
@@ -22,6 +24,7 @@ const ProfileScreen = () => {
   const user = getCurrentUser();
   const [stats, setStats] = useState({ total: 0, completed: 0, withLocation: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [permissionStatus, setPermissionStatus] = useState({ notifications: false, location: false });
 
   const email = user?.email ?? 'Unknown';
   const initials = email.charAt(0).toUpperCase();
@@ -46,7 +49,22 @@ const ProfileScreen = () => {
     }
   }, [user]);
 
-  useFocusEffect(useCallback(() => { loadStats(); }, [loadStats]));
+  const loadPermissionStatus = useCallback(async () => {
+    try {
+      const [notifications, location] = await Promise.all([
+        getNotificationPermissionStatus(),
+        getLocationPermissionStatus(),
+      ]);
+      setPermissionStatus({ notifications, location });
+    } catch {
+      setPermissionStatus({ notifications: false, location: false });
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadStats();
+    loadPermissionStatus();
+  }, [loadStats, loadPermissionStatus]));
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -115,7 +133,9 @@ const ProfileScreen = () => {
               <MaterialIcons name="notifications" size={17} color="#22D3EE" />
             </View>
             <Text style={styles.menuLabel}>Notifications</Text>
-            <Text style={styles.menuValue}>Enabled</Text>
+            <Text style={permissionStatus.notifications ? styles.menuValueEnabled : styles.menuValueDisabled}>
+              {permissionStatus.notifications ? 'Enabled' : 'Disabled'}
+            </Text>
           </View>
           <View style={styles.menuDivider} />
           <View style={styles.menuRow}>
@@ -123,7 +143,9 @@ const ProfileScreen = () => {
               <MaterialIcons name="location-on" size={17} color="#34D399" />
             </View>
             <Text style={styles.menuLabel}>Location</Text>
-            <Text style={styles.menuValue}>Enabled</Text>
+            <Text style={permissionStatus.location ? styles.menuValueEnabled : styles.menuValueDisabled}>
+              {permissionStatus.location ? 'Enabled' : 'Disabled'}
+            </Text>
           </View>
         </View>
 
@@ -197,6 +219,8 @@ const styles = StyleSheet.create({
   },
   menuLabel: { flex: 1, fontSize: 14, color: '#E6EDF3', fontWeight: '500' },
   menuValue: { fontSize: 12, color: '#8B949E', maxWidth: 150 },
+  menuValueEnabled: { fontSize: 12, color: '#34D399', fontWeight: '700', maxWidth: 150 },
+  menuValueDisabled: { fontSize: 12, color: '#EF4444', fontWeight: '700', maxWidth: 150 },
   menuDivider: { height: 1, backgroundColor: '#21262D', marginLeft: 62 },
 
   signOutButton: {

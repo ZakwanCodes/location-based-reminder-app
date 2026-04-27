@@ -15,6 +15,12 @@ export async function requestLocationPermissions(): Promise<boolean> {
   return status === 'granted';
 }
 
+/** Returns whether foreground location permission is currently granted without prompting the user. */
+export async function getLocationPermissionStatus(): Promise<boolean> {
+  const { status } = await Location.getForegroundPermissionsAsync();
+  return status === 'granted';
+}
+
 /** Returns the device's current GPS coordinates at high accuracy. */
 export async function getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
   const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -64,8 +70,8 @@ export function getDistanceMetres(
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 

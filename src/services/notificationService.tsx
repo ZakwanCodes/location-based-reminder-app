@@ -31,6 +31,12 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   return status === 'granted';
 }
 
+/** Returns whether notification permission is currently granted without triggering a permission prompt. */
+export async function getNotificationPermissionStatus(): Promise<boolean> {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status === 'granted';
+}
+
 /** Persists a received notification to AsyncStorage. Deduplicates by request identifier so the same notification is never stored twice. */
 export async function storeNotification(notification: Notifications.Notification): Promise<void> {
   const existing = await getStoredNotifications();

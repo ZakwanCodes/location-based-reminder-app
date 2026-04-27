@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -15,6 +17,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { getUserReminders } from '../services/databaseService';
 import { getCurrentUser } from '../services/authService';
 import {
+  requestLocationPermissions,
   getCurrentLocation,
   getAddressFromCoords,
   getDistanceMetres,
@@ -160,14 +163,14 @@ const MapScreen = () => {
         try {
           const raw = await AsyncStorage.getItem(`notified_ids_${user.uid}`);
           if (raw) notifiedIds.current = new Set(JSON.parse(raw));
-        } catch {}
+        } catch { }
       }
       setIdsLoaded(true);
     };
     loadIds();
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (showPermissionAlert = false) => {
     const user = getCurrentUser();
     if (!user) {
       setStatusMessage('Log in to see your reminders.');
@@ -176,6 +179,25 @@ const MapScreen = () => {
     setLoading(true);
     setStatusMessage('');
     try {
+      const granted = await requestLocationPermissions();
+      if (!granted) {
+        setUserAddress('');
+        setUserLocation(null);
+        setNearby([]);
+        setStatusMessage('Location permission is disabled. Enable it in Settings to refresh nearby reminders.');
+        if (showPermissionAlert) {
+          Alert.alert(
+            'Location Disabled',
+            'Location access is required to refresh nearby reminders. Please enable it in app settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ],
+          );
+        }
+        return;
+      }
+
       const [coords, data] = await Promise.all([
         getCurrentLocation(),
         getUserReminders(user.uid),
@@ -228,7 +250,9 @@ const MapScreen = () => {
     }
   }, []);
 
-  useEffect(() => { if (idsLoaded) refresh(); }, [idsLoaded, refresh]);
+  useEffect(() => {
+    if (idsLoaded) refresh(false);
+  }, [idsLoaded, refresh]);
 
   const renderNearby = ({ item }: { item: NearbyReminder }) => {
     const isVeryClose = item.distanceMetres <= item.location!.radius;
@@ -266,7 +290,7 @@ const MapScreen = () => {
             {userAddress ? `📍 ${userAddress}` : 'Location unavailable'}
           </Text>
         )}
-        <TouchableOpacity onPress={refresh} disabled={loading} style={styles.refreshBtn}>
+        <TouchableOpacity onPress={() => refresh(true)} disabled={loading} style={styles.refreshBtn}>
           <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>
       </View>
