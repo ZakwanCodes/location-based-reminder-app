@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1117', paddingHorizontal: 16, paddingTop: 12 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   headerIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(99,102,241,0.12)' },
-  heading: { fontSize: 26, fontWeight: '800', color: '#E6EDF3', marginBottom: 10 },
+  heading: { fontSize: 26, fontWeight: '800', color: '#E6EDF3' },
   sectionTitle: { fontSize: 11, fontWeight: '700', color: '#6366F1', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 10, marginBottom: 6 },
   createCard: { borderWidth: 1, borderColor: '#21262D', borderRadius: 14, backgroundColor: '#161B22', padding: 14, marginTop: 6, marginBottom: 12 },
   createToggle: { borderWidth: 1, borderColor: '#21262D', borderRadius: 14, backgroundColor: '#161B22', paddingHorizontal: 14, paddingVertical: 12, marginTop: 6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
