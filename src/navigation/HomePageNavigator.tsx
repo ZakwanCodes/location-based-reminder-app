@@ -41,7 +41,7 @@ const HomePageNavigator = () => {
       })}
     >
       <Tab.Screen name="Reminders" component={RemindersScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen name="Map" component={MapScreen} options={{ tabBarLabel: 'Details' }} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
