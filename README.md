@@ -22,7 +22,7 @@ Location-based Reminder App — create reminders that trigger when you arrive ne
 - react-native-safe-area-context
 
 ## Project structure (high level)
-- `src/screens/` — app screens (reminders, map, profile, auth)
+- `src/screens/` — app screens (reminders, details, profile, auth)
 - `src/components/` — shared UI components (e.g., LocationSearchModal)
 - `src/services/` — Firebase, notifications, location helpers
 - `assets/` — icons and images
