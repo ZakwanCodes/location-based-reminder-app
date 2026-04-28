@@ -70,30 +70,3 @@ export const deleteReminder = async (reminderId: string) => {
     return await deleteDoc(doc(db, 'reminders', reminderId));
 };
 
-// ===== USER PROFILE =====
-
-/** Creates a new user profile document in the 'users' collection. */
-export const saveUserProfile = async (
-    userId: string,
-    profileData: {
-        displayName?: string;
-        email: string;
-        photoURL?: string;
-    }
-) => {
-    return await addDoc(collection(db, 'users'), {
-        userId,
-        ...profileData,
-        createdAt: Timestamp.now(),
-    });
-};
-
-/** Looks up a user's profile document by their Firebase Auth UID. Returns null if not found. */
-export const getUserProfile = async (userId: string) => {
-    const q = query(collection(db, 'users'), where('userId', '==', userId));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-        return null;
-    }
-    return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
-};

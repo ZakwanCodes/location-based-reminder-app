@@ -4,6 +4,7 @@ import { useRoute, RouteProp } from '@react-navigation/native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { HomeTabParamList } from '../navigation/HomePageNavigator';
 import LocationSearchModal from '../components/LocationSearchModal';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Alert,
   FlatList,
@@ -293,272 +294,274 @@ const RemindersScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerIcon}>
-          <MaterialIcons name="notifications-active" size={24} color="#6366F1" />
-        </View>
-        <Text style={styles.heading}>My Reminders</Text>
-      </View>
-      {!!editingId && (
-        <View style={styles.editBanner}>
-          <MaterialIcons name="edit" size={13} color="#FBBF24" />
-          <Text style={styles.editBannerText}>Editing reminder</Text>
-          <TouchableOpacity onPress={resetForm} style={styles.editCancelBtn}>
-            <Text style={styles.editCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {!!statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
-
-      <TouchableOpacity style={styles.createToggle} onPress={() => setShowCreateForm(v => !v)} activeOpacity={0.8}>
-        <View>
-          <Text style={styles.createToggleTitle}>Create Reminder</Text>
-          <Text style={styles.createToggleSubtitle}>Tap to {showCreateForm ? 'collapse' : 'expand'} the form</Text>
-        </View>
-        <MaterialIcons name={showCreateForm ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={24} color="#6366F1" />
-      </TouchableOpacity>
-
-      {showCreateForm && (
-        <View style={styles.createCard}>
-          {/* ── Form ── */}
-          <Text style={styles.sectionTitle}>Details</Text>
-          <TextInput
-            style={[styles.input, !!errors.title && styles.inputError]}
-            placeholder="Title"
-            placeholderTextColor="#4B5563"
-            value={title}
-            onChangeText={t => { setTitle(t); if (errors.title) setErrors(e => ({ ...e, title: undefined })); }}
-          />
-          {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
-
-          <TextInput
-            style={[styles.input, !!errors.description && styles.inputError]}
-            placeholder="Description"
-            placeholderTextColor="#4B5563"
-            value={description}
-            onChangeText={t => { setDescription(t); if (errors.description) setErrors(e => ({ ...e, description: undefined })); }}
-          />
-          {!!errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
-
-          <TouchableOpacity
-            style={[styles.dateButton, !!errors.date && styles.inputError]}
-            onPress={openDatePicker}
-          >
-            <Text style={[styles.dateButtonText, !dueDate && styles.placeholderText]}>
-              {dueDate ? `Due: ${dueDate.toDateString()}` : 'Select due date'}
-            </Text>
-          </TouchableOpacity>
-          {!!errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-
-          {showDatePicker && Platform.OS === 'android' && (
-            <DateTimePicker
-              value={draftDate}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-            />
-          )}
-
-          <Modal
-            visible={showDatePicker && Platform.OS === 'ios'}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowDatePicker(false)}
-          >
-            <View style={styles.dateModalOverlay}>
-              <View style={styles.dateModalCard}>
-                <Text style={styles.dateModalTitle}>Pick a due date</Text>
-                <DateTimePicker
-                  value={draftDate}
-                  mode="date"
-                  display="spinner"
-                  themeVariant="dark"
-                  textColor="#E6EDF3"
-                  accentColor="#818CF8"
-                  onChange={handleDateChange}
-                  style={styles.dateModalPicker}
-                />
-                <View style={styles.dateModalActions}>
-                  <TouchableOpacity
-                    style={[styles.dateModalBtn, styles.dateModalBtnGhost]}
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text style={styles.dateModalBtnGhostText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.dateModalBtn, styles.dateModalBtnPrimary]}
-                    onPress={() => {
-                      setDueDate(draftDate);
-                      setErrors(e => ({ ...e, date: undefined }));
-                      setShowDatePicker(false);
-                    }}
-                  >
-                    <Text style={styles.dateModalBtnPrimaryText}>Confirm</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-
-          {/* ── Location ── */}
-          <Text style={styles.sectionTitle}>Location</Text>
-          {location ? (
-            <TouchableOpacity
-              style={[styles.locationButton, styles.locationButtonActive]}
-              onPress={() => setLocation(null)}
-            >
-              <Text style={[styles.locationButtonText, styles.locationButtonTextActive]}>
-                {`📍 ${location.address ?? 'Location set'}  ✕`}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.locationRow}>
-              <TouchableOpacity
-                style={[styles.locationHalfButton, locationLoading && { opacity: 0.6 }]}
-                onPress={handleAttachLocation}
-                disabled={locationLoading}
-              >
-                {locationLoading
-                  ? <ActivityIndicator size="small" color="#456FE8" />
-                  : <Text style={styles.locationButtonText}>📍 My Location</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.locationHalfButton}
-                onPress={() => setShowLocationSearch(true)}
-              >
-                <Text style={styles.locationButtonText}>🔍 Search Place</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!!errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
-
-          <Text style={styles.sectionTitle}>Priority</Text>
-          <LocationSearchModal
-            visible={showLocationSearch}
-            onConfirm={(loc) => { setLocation(loc); setErrors(e => ({ ...e, location: undefined })); setShowLocationSearch(false); }}
-            onClose={() => setShowLocationSearch(false)}
-          />
-
-          {/* ── Priority ── */}
-          <View style={styles.priorityRow}>
-            {(['low', 'medium', 'high'] as const).map((value) => (
-              <TouchableOpacity
-                key={value}
-                style={[styles.priorityChip, priority === value && styles.priorityChipActive]}
-                onPress={() => setPriority(value)}
-              >
-                <Text style={[styles.priorityText, priority === value && styles.priorityTextActive]}>
-                  {value.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerIcon}>
+            <MaterialIcons name="notifications-active" size={24} color="#6366F1" />
           </View>
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCreateReminder} disabled={isLoading}>
-              <Text style={styles.buttonText}>{editingId ? 'Save Changes' : 'Create'}</Text>
-            </TouchableOpacity>
-            {editingId ? (
-              <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={resetForm} disabled={isLoading}>
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => {
-                  resetForm();
-                  fetchReminders();
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.buttonText}>Refresh</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text style={styles.heading}>My Reminders</Text>
         </View>
-      )}
-
-      {/* ── List ── */}
-      <FlatList
-        data={reminders.filter(r => !r.completed)}
-        keyExtractor={(item) => item.id}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={<Text style={styles.emptyText}>No active reminders yet.</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title || 'Untitled'}</Text>
-            {!!item.description && <Text style={styles.cardDescription}>{item.description}</Text>}
-            <Text style={styles.cardMeta}>Due: {formatDueDate(item.dueDate)}</Text>
-            <Text style={styles.cardMeta}>Priority: {item.priority ?? 'medium'}</Text>
-            {item.location && (
-              <Text style={styles.cardLocation}>📍 {item.location.address ?? `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`}</Text>
-            )}
-            <View style={styles.cardButtons}>
-              <TouchableOpacity
-                style={[styles.smallButton, styles.editButton]}
-                onPress={() => handleEditReminder(item)}
-              >
-                <MaterialIcons name="edit" size={13} color="#FBBF24" />
-                <Text style={[styles.smallButtonText, { color: '#FBBF24' }]}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.smallButton, styles.doneButton]}
-                onPress={() => confirmMarkDone(item)}
-              >
-                <Text style={[styles.smallButtonText, { color: '#34D399' }]}>Done</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.smallButton, styles.deleteButton]} onPress={() => confirmDelete(item.id)}>
-                <Text style={[styles.smallButtonText, { color: '#EF4444' }]}>Delete</Text>
-              </TouchableOpacity>
-            </View>
+        {!!editingId && (
+          <View style={styles.editBanner}>
+            <MaterialIcons name="edit" size={13} color="#FBBF24" />
+            <Text style={styles.editBannerText}>Editing reminder</Text>
+            <TouchableOpacity onPress={resetForm} style={styles.editCancelBtn}>
+              <Text style={styles.editCancelText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         )}
-        ListFooterComponent={() => {
-          const past = reminders.filter(r => r.completed);
-          if (past.length === 0) return null;
-          return (
-            <View>
-              <TouchableOpacity
-                style={styles.pastHeader}
-                onPress={() => setShowPastReminders(v => !v)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.pastHeaderText}>Past Reminders ({past.length})</Text>
-                <MaterialIcons
-                  name={showPastReminders ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                  size={20}
-                  color="#4B5563"
-                />
-              </TouchableOpacity>
-              {showPastReminders && past.map(item => (
-                <View key={item.id} style={styles.cardPast}>
-                  <Text style={styles.cardTitlePast}>{item.title || 'Untitled'}</Text>
-                  {!!item.description && <Text style={styles.cardDescription}>{item.description}</Text>}
-                  <Text style={styles.cardMeta}>Due: {formatDueDate(item.dueDate)}</Text>
-                  {item.location && (
-                    <Text style={styles.cardLocation}>📍 {item.location.address ?? `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`}</Text>
-                  )}
-                  <View style={styles.cardButtons}>
+        {!!statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
+
+        <TouchableOpacity style={styles.createToggle} onPress={() => setShowCreateForm(v => !v)} activeOpacity={0.8}>
+          <View>
+            <Text style={styles.createToggleTitle}>Create Reminder</Text>
+            <Text style={styles.createToggleSubtitle}>Tap to {showCreateForm ? 'collapse' : 'expand'} the form</Text>
+          </View>
+          <MaterialIcons name={showCreateForm ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={24} color="#6366F1" />
+        </TouchableOpacity>
+
+        {showCreateForm && (
+          <View style={styles.createCard}>
+            {/* ── Form ── */}
+            <Text style={styles.sectionTitle}>Details</Text>
+            <TextInput
+              style={[styles.input, !!errors.title && styles.inputError]}
+              placeholder="Title"
+              placeholderTextColor="#4B5563"
+              value={title}
+              onChangeText={t => { setTitle(t); if (errors.title) setErrors(e => ({ ...e, title: undefined })); }}
+            />
+            {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+
+            <TextInput
+              style={[styles.input, !!errors.description && styles.inputError]}
+              placeholder="Description"
+              placeholderTextColor="#4B5563"
+              value={description}
+              onChangeText={t => { setDescription(t); if (errors.description) setErrors(e => ({ ...e, description: undefined })); }}
+            />
+            {!!errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+
+            <TouchableOpacity
+              style={[styles.dateButton, !!errors.date && styles.inputError]}
+              onPress={openDatePicker}
+            >
+              <Text style={[styles.dateButtonText, !dueDate && styles.placeholderText]}>
+                {dueDate ? `Due: ${dueDate.toDateString()}` : 'Select due date'}
+              </Text>
+            </TouchableOpacity>
+            {!!errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
+
+            {showDatePicker && Platform.OS === 'android' && (
+              <DateTimePicker
+                value={draftDate}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
+
+            <Modal
+              visible={showDatePicker && Platform.OS === 'ios'}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowDatePicker(false)}
+            >
+              <View style={styles.dateModalOverlay}>
+                <View style={styles.dateModalCard}>
+                  <Text style={styles.dateModalTitle}>Pick a due date</Text>
+                  <DateTimePicker
+                    value={draftDate}
+                    mode="date"
+                    display="spinner"
+                    themeVariant="dark"
+                    textColor="#E6EDF3"
+                    accentColor="#818CF8"
+                    onChange={handleDateChange}
+                    style={styles.dateModalPicker}
+                  />
+                  <View style={styles.dateModalActions}>
                     <TouchableOpacity
-                      style={[styles.smallButton, styles.secondaryButton]}
-                      onPress={() => handleToggleComplete(item)}
+                      style={[styles.dateModalBtn, styles.dateModalBtnGhost]}
+                      onPress={() => setShowDatePicker(false)}
                     >
-                      <Text style={styles.smallButtonText}>Restore</Text>
+                      <Text style={styles.dateModalBtnGhostText}>Cancel</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.smallButton, styles.deleteButton]} onPress={() => confirmDelete(item.id)}>
-                      <Text style={[styles.smallButtonText, { color: '#EF4444' }]}>Delete</Text>
+                    <TouchableOpacity
+                      style={[styles.dateModalBtn, styles.dateModalBtnPrimary]}
+                      onPress={() => {
+                        setDueDate(draftDate);
+                        setErrors(e => ({ ...e, date: undefined }));
+                        setShowDatePicker(false);
+                      }}
+                    >
+                      <Text style={styles.dateModalBtnPrimaryText}>Confirm</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
+              </View>
+            </Modal>
+
+            {/* ── Location ── */}
+            <Text style={styles.sectionTitle}>Location</Text>
+            {location ? (
+              <TouchableOpacity
+                style={[styles.locationButton, styles.locationButtonActive]}
+                onPress={() => setLocation(null)}
+              >
+                <Text style={[styles.locationButtonText, styles.locationButtonTextActive]}>
+                  {`📍 ${location.address ?? 'Location set'}  ✕`}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.locationRow}>
+                <TouchableOpacity
+                  style={[styles.locationHalfButton, locationLoading && { opacity: 0.6 }]}
+                  onPress={handleAttachLocation}
+                  disabled={locationLoading}
+                >
+                  {locationLoading
+                    ? <ActivityIndicator size="small" color="#456FE8" />
+                    : <Text style={styles.locationButtonText}>📍 My Location</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.locationHalfButton}
+                  onPress={() => setShowLocationSearch(true)}
+                >
+                  <Text style={styles.locationButtonText}>🔍 Search Place</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!!errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
+
+            <Text style={styles.sectionTitle}>Priority</Text>
+            <LocationSearchModal
+              visible={showLocationSearch}
+              onConfirm={(loc) => { setLocation(loc); setErrors(e => ({ ...e, location: undefined })); setShowLocationSearch(false); }}
+              onClose={() => setShowLocationSearch(false)}
+            />
+
+            {/* ── Priority ── */}
+            <View style={styles.priorityRow}>
+              {(['low', 'medium', 'high'] as const).map((value) => (
+                <TouchableOpacity
+                  key={value}
+                  style={[styles.priorityChip, priority === value && styles.priorityChipActive]}
+                  onPress={() => setPriority(value)}
+                >
+                  <Text style={[styles.priorityText, priority === value && styles.priorityTextActive]}>
+                    {value.toUpperCase()}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
-          );
-        }}
-      />
-    </View>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleCreateReminder} disabled={isLoading}>
+                <Text style={styles.buttonText}>{editingId ? 'Save Changes' : 'Create'}</Text>
+              </TouchableOpacity>
+              {editingId ? (
+                <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={resetForm} disabled={isLoading}>
+                  <Text style={styles.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton]}
+                  onPress={() => {
+                    resetForm();
+                    fetchReminders();
+                  }}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.buttonText}>Refresh</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ── List ── */}
+        <FlatList
+          data={reminders.filter(r => !r.completed)}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={<Text style={styles.emptyText}>No active reminders yet.</Text>}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{item.title || 'Untitled'}</Text>
+              {!!item.description && <Text style={styles.cardDescription}>{item.description}</Text>}
+              <Text style={styles.cardMeta}>Due: {formatDueDate(item.dueDate)}</Text>
+              <Text style={styles.cardMeta}>Priority: {item.priority ?? 'medium'}</Text>
+              {item.location && (
+                <Text style={styles.cardLocation}>📍 {item.location.address ?? `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`}</Text>
+              )}
+              <View style={styles.cardButtons}>
+                <TouchableOpacity
+                  style={[styles.smallButton, styles.editButton]}
+                  onPress={() => handleEditReminder(item)}
+                >
+                  <MaterialIcons name="edit" size={13} color="#FBBF24" />
+                  <Text style={[styles.smallButtonText, { color: '#FBBF24' }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.smallButton, styles.doneButton]}
+                  onPress={() => confirmMarkDone(item)}
+                >
+                  <Text style={[styles.smallButtonText, { color: '#34D399' }]}>Done</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.smallButton, styles.deleteButton]} onPress={() => confirmDelete(item.id)}>
+                  <Text style={[styles.smallButtonText, { color: '#EF4444' }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          ListFooterComponent={() => {
+            const past = reminders.filter(r => r.completed);
+            if (past.length === 0) return null;
+            return (
+              <View>
+                <TouchableOpacity
+                  style={styles.pastHeader}
+                  onPress={() => setShowPastReminders(v => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.pastHeaderText}>Past Reminders ({past.length})</Text>
+                  <MaterialIcons
+                    name={showPastReminders ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                    size={20}
+                    color="#4B5563"
+                  />
+                </TouchableOpacity>
+                {showPastReminders && past.map(item => (
+                  <View key={item.id} style={styles.cardPast}>
+                    <Text style={styles.cardTitlePast}>{item.title || 'Untitled'}</Text>
+                    {!!item.description && <Text style={styles.cardDescription}>{item.description}</Text>}
+                    <Text style={styles.cardMeta}>Due: {formatDueDate(item.dueDate)}</Text>
+                    {item.location && (
+                      <Text style={styles.cardLocation}>📍 {item.location.address ?? `${item.location.latitude.toFixed(4)}, ${item.location.longitude.toFixed(4)}`}</Text>
+                    )}
+                    <View style={styles.cardButtons}>
+                      <TouchableOpacity
+                        style={[styles.smallButton, styles.secondaryButton]}
+                        onPress={() => handleToggleComplete(item)}
+                      >
+                        <Text style={styles.smallButtonText}>Restore</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.smallButton, styles.deleteButton]} onPress={() => confirmDelete(item.id)}>
+                        <Text style={[styles.smallButtonText, { color: '#EF4444' }]}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            );
+          }}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -567,7 +570,8 @@ export default RemindersScreen;
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D1117', paddingHorizontal: 16, paddingTop: 56 },
+  safe: { flex: 1, backgroundColor: '#0D1117' },
+  container: { flex: 1, backgroundColor: '#0D1117', paddingHorizontal: 16, paddingTop: 12 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   headerIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(99,102,241,0.12)' },
   heading: { fontSize: 26, fontWeight: '800', color: '#E6EDF3', marginBottom: 10 },

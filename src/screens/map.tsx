@@ -51,6 +51,14 @@ const formatDueDate = (date: ReminderItem['dueDate']) => {
   return 'Unknown date';
 };
 
+const toDate = (date: ReminderItem['dueDate']) => {
+  if (!date) return null;
+  if (date instanceof Date) return date;
+  if (typeof (date as any).toDate === 'function') return (date as any).toDate();
+  const parsed = new Date(date as string);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
 type DetailModalProps = {
@@ -225,13 +233,17 @@ const MapScreen = () => {
 
       let idsChanged = false;
       for (const r of withDist) {
-        if (r.distanceMetres <= r.location!.radius && !notifiedIds.current.has(r.id)) {
+        const dueDate = toDate(r.dueDate);
+        const isDue = !!dueDate && dueDate.getTime() <= Date.now();
+        if (isDue && r.distanceMetres <= r.location!.radius && !notifiedIds.current.has(r.id)) {
           notifiedIds.current.add(r.id);
           idsChanged = true;
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: 'Location Reminder',
-              body: r.title ?? 'You are near a reminder location',
+              title: 'Reminder due now',
+              body: r.title
+                ? `${r.title} is due and you are near the location`
+                : 'A reminder is due and you are near the location',
             },
             trigger: null,
           });
